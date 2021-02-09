@@ -1,0 +1,47 @@
+# Recreating coc_reporting.ea_eventattendance table from SQL to R.
+# IN PROGRESS
+
+
+#Install packages
+install.packages('dplyr')
+install.packages('ggplot2') #graphing
+install.packages('readr')
+install.packages('devtools')
+install.packages('stringr') #working with character strings
+
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(devtools)
+library(stringr)
+
+
+#Bring in all tables
+events <- read_civis("tmc_van.coc_events", database="TMC")
+eventsignups <- read_civis("tmc_van.coc_eventsignups", database="TMC")
+eventsignupsstatuses <- read_civis("tmc_van.coc_eventsignupsstatuses", database="TMC")
+eventslocations <- read_civis("tmc_van.coc_eventslocations", database="TMC")
+locations <- read_civis("tmc_van.coc_locations", database="TMC")
+contactsaddresses_mym <- read_civis("tmc_van.coc_contactsaddresses_mym", database="TMC")
+contacts_mym <- read_civis("tmc_van.coc_contacts_mym", database="TMC")
+misc_zip_lat_long <- read_civis("tmc_misc.zip_lat_long ", database="TMC")
+
+
+#Join all tables
+all_ea_tables <- events %>%
+  left_join(eventsignups, by = c('eventid' = 'eventid'), suffix = c('_events', 'eventsignsups')) %>%
+  left_join(eventsignupsstatuses, by = c('eventsignupid' = 'eventsignupid'), suffix = c('_eventsignups', '_eventsignupstatuses')) %>%
+  left_join(eventslocations, by = c('eventid' = 'eventid'), suffix = c('_events','_eventslocations'))
+  
+all_ea_tables <- all_ea_tables %>%
+  left_join(locations, by = c('locationid_eventslocations' = 'locationid'), suffix = c('_eventslocations', "_locations"))
+
+
+#Filter table
+all_ea_tables_2 <- all_ea_tables %>%
+  filter(eventrolename == 'Attendee', eventstatusname == 'Completed', dateoffsetbegin >= "2020-09-01" & dateoffsetbegin < date()), !str_detect(eventname, ".Cancelled."))
+
+
+#Select and rename fields
+all_ea_tables_3 <- all_ea_tables_2 %>%
+  select(eventid, eventname, eventcalendarname , dateoffsetbegin, vanid)

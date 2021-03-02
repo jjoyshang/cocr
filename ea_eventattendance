@@ -7,16 +7,17 @@ install.packages('dplyr')
 install.packages('ggplot2') #graphing
 install.packages('readr')
 install.packages('devtools')
-install.packages('stringr') #working with character strings
+install.packages('stringr')
+install.packages('civis')
 
 library(dplyr)
 library(ggplot2)
 library(readr)
 library(devtools)
 library(stringr)
+library(civis)
 
-
-#Bring in all tables
+#Bring in all tables for coc_reporting.ea_eventattendance table in Civis
 events <- read_civis("tmc_van.coc_events", database="TMC")
 eventsignups <- read_civis("tmc_van.coc_eventsignups", database="TMC")
 eventsignupsstatuses <- read_civis("tmc_van.coc_eventsignupsstatuses", database="TMC")
@@ -26,7 +27,6 @@ contactsaddresses_mym <- read_civis("tmc_van.coc_contactsaddresses_mym", databas
 contacts_mym <- read_civis("tmc_van.coc_contacts_mym", database="TMC")
 misc_zip_lat_long <- read_civis("tmc_misc.zip_lat_long ", database="TMC")
 
-
 #Join all tables
 all_ea_tables <- events %>%
   left_join(eventsignups, by = c('eventid' = 'eventid'), suffix = c('_events', 'eventsignsups')) %>%
@@ -34,14 +34,17 @@ all_ea_tables <- events %>%
   left_join(eventslocations, by = c('eventid' = 'eventid'), suffix = c('_events','_eventslocations'))
   
 all_ea_tables <- all_ea_tables %>%
-  left_join(locations, by = c('locationid_eventslocations' = 'locationid'), suffix = c('_eventslocations', "_locations"))
-
+  left_join(locations, by = c('locationid_eventslocations' = 'locationid'), suffix = c('_eventslocations', "_locations")) %>%
+  left_join(contacts_mym, by = c('vanid' = 'vanid'), suffix = c("_eventsignups", "_contacts")) %>%
+  left_join(contactsaddresses_mym, by = c("vanid" = "vanid"), suffix = c("_eventsignups", "_contactsaddresses"))
 
 #Filter table
 all_ea_tables_2 <- all_ea_tables %>%
-  filter(eventrolename == 'Attendee', eventstatusname == 'Completed', dateoffsetbegin >= "2020-09-01" & dateoffsetbegin < date()), !str_detect(eventname, ".Cancelled."))
+  filter(eventrolename == 'Attendee', eventstatusname == 'Completed', !str_detect(eventname, ".Cancelled.")) %>%
+  filter(dateoffsetbegin >= "2020-09-01" & dateoffsetbegin < date())
 
-
-#Select and rename fields
+#Select fields
 all_ea_tables_3 <- all_ea_tables_2 %>%
-  select(eventid, eventname, eventcalendarname , dateoffsetbegin, vanid)
+  select(eventid, eventname, eventcalendarname , dateoffsetbegin, statecode_eventslocations , vanid, )
+
+#Dedup signups

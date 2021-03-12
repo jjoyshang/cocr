@@ -2,7 +2,7 @@
 rm(list = ls())
 
 
-# Install packages
+# Load packages
 library(dplyr)
 library(readr)
 library(devtools)

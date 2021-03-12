@@ -1,80 +1,165 @@
-#Install packages
-install.packages('dplyr')
-install.packages('ggplot2') #graphing
-install.packages('readr')
-install.packages('devtools')
-install.packages('stringr')
-install.packages('civis')
+# Clear work space
+rm(list = ls())
 
+
+# Install packages
 library(dplyr)
-library(ggplot2)
 library(readr)
 library(devtools)
 library(stringr)
 library(civis)
 
-#Bring in all tables for coc_reporting.ea_eventattendance table in Civis
-events <- read_civis("tmc_van.coc_events", database="TMC")
-eventsignups <- read_civis("tmc_van.coc_eventsignups", database="TMC")
-eventsignupsstatuses <- read_civis("tmc_van.coc_eventsignupsstatuses", database="TMC")
-eventslocations <- read_civis("tmc_van.coc_eventslocations", database="TMC")
-locations <- read_civis("tmc_van.coc_locations", database="TMC")
-contactsaddresses_mym <- read_civis("tmc_van.coc_contactsaddresses_mym", database="TMC")
-contacts_mym <- read_civis("tmc_van.coc_contacts_mym", database="TMC")
-misc_zip_lat_long <- read_civis("tmc_misc.zip_lat_long ", database="TMC")
 
-#Select + filter fields
-events_2 <- events %>%
-  filter(dateoffsetbegin >= "2020-09-01" & dateoffsetbegin < date(), !str_detect(eventname, ".Cancelled.")) %>%
-  select(eventid, dateoffsetbegin, eventname, eventcalendarname)
-eventsignupsstatuses_2 <- eventsignupsstatuses %>%
-  filter(eventstatusname == 'Completed') %>%
-  select(eventsignupid, datemodified)
-eventsignups_2 <- eventsignups %>%
-  filter(eventrolename == 'Attendee') %>%
-  select(eventid, vanid, eventsignupid)
-eventslocations_2 <- eventslocations %>%
-  select(eventid, locationid)
-locations_2 <- locations %>%
-  select(locationid, state)
-contactsaddresses_2 <- contactsaddresses_mym %>%
-  select(vanid, zip5, datemodified)
-contacts_2 <- contacts_mym %>%
-  select(vanid, firstname, lastname)
+# Bring in all tables for coc_reporting.ea_eventattendance table in Civis
+events <- read_civis(
+  "tmc_van.coc_events", database = "TMC"
+)
+eventsignups <- read_civis(
+  "tmc_van.coc_eventsignups", database = "TMC"
+)
+eventsignupsstatuses <- read_civis(
+  "tmc_van.coc_eventsignupsstatuses", database = "TMC"
+)
+eventslocations <- read_civis(
+  "tmc_van.coc_eventslocations", database = "TMC"
+)
+locations <- read_civis(
+  "tmc_van.coc_locations", database = "TMC"
+)
+contactsaddresses <- read_civis(
+  "tmc_van.coc_contactsaddresses_mym", database = "TMC"
+)
+contacts <- read_civis(
+  "tmc_van.coc_contacts_mym", database = "TMC"
+)
+misc_zip_lat_long <- read_civis(
+  "tmc_misc.zip_lat_long ", database = "TMC"
+)
 
-#Join all tables
-all_ea_tables <- events_2 %>%
-  left_join(eventsignups_2, by = c('eventid' = 'eventid')) %>%
-  left_join(eventsignupsstatuses_2, by = c('eventsignupid' = 'eventsignupid')) %>%
-  left_join(eventslocations_2, by = c('eventid' = 'eventid'))
+
+# Select + filter fields
+events <- events %>%
+  filter(
+    dateoffsetbegin >= '2020-09-01' & dateoffsetbegin < date(),
+    !str_detect(eventname, '.Cancelled.')
+    ) %>%
+  select(
+    eventid, dateoffsetbegin, eventname, eventcalendarname
+  )
+
+eventsignupsstatuses <- eventsignupsstatuses %>%
+  filter(
+    eventstatusname == 'Completed'
+    ) %>%
+  select(
+    eventsignupid, datemodified
+  )
+
+eventsignups <- eventsignups %>%
+  filter(
+    eventrolename == 'Attendee'
+    ) %>%
+  select(
+    eventid, vanid, eventsignupid
+  )
+
+eventslocations <- eventslocations %>%
+  select(
+    eventid, locationid
+  )
+
+locations <- locations %>%
+  select(
+    locationid, state
+  )
+
+contactsaddresses <- contactsaddresses %>%
+  select(
+    vanid, zip5, datemodified
+  )
+
+contacts <- contacts %>%
+  select(
+    vanid, firstname, lastname
+  )
+
+
+# Join all tables
+all_ea_tables <- events %>%
+  left_join(
+    eventsignups, by = c('eventid' = 'eventid')
+  ) %>%
+  left_join(
+    eventsignupsstatuses, by = c('eventsignupid' = 'eventsignupid'), 
+        suffix = c('.eventsignups', '.eventsignupsstatuses')
+  ) %>%
+  left_join(
+    eventslocations, by = c('eventid' = 'eventid')
+  )
   
 all_ea_tables <- all_ea_tables %>%
-  left_join(locations_2, by = c('locationid' = 'locationid')) %>%
-  left_join(contacts_2, by = c('vanid' = 'vanid')) %>%
-  left_join(contactsaddresses_2, by = c("vanid" = "vanid"))
+  left_join(
+    locations, by = c('locationid' = 'locationid')
+  ) %>%
+  left_join(
+    contacts, by = c('vanid' = 'vanid')
+  ) %>%
+  left_join(
+    contactsaddresses, by = c('vanid' = 'vanid'), 
+        suffix = c('.eventsignups', '.contactsaddresses')
+  )
 
-#Dedup signups
-all_ea_tables_2 <- all_ea_tables %>%
-  group_by(eventid, vanid) %>%
-  filter(datemodified.x==max(datemodified.x)) %>%
-  distinct()
 
-#Dedup attendee addresses
-all_ea_tables_2 <- all_ea_tables_2 %>%
-  group_by(eventid, vanid) %>%
-  filter(datemodified.y==max(datemodified.y)) %>%
-  distinct()
+# Dedup signups
+all_ea_tables <- all_ea_tables %>%
+  group_by(
+    eventid, vanid
+  ) %>%
+  filter(
+    datemodified.eventsignups == max(datemodified.eventsignups)
+  ) %>%
+  distinct(
+  )
 
-#Fix event type for Allies events
-all_ea_tables_3 <- all_ea_tables_2 %>%
-  mutate(eventtype = if_else(!str_detect(eventcalendarname, "._allies"), "Training", eventcalendarname))
 
-#Select final fields and rename
-all_ea_tables_final <- all_ea_tables_3 %>%
-  select(eventid, dateoffsetbegin, eventname, eventtype, state, vanid, firstname, lastname, zip5) %>%
-  rename(eventdate = dateoffsetbegin) %>%
-  rename(attendeeid = vanid) %>%
-  rename (attendeezip = zip5)
+# Dedup attendee addresses
+all_ea_tables <- all_ea_tables %>%
+  group_by(
+    eventid, vanid
+  ) %>%
+  filter(
+    datemodified.contactsaddresses == max(datemodified.contactsaddresses)
+  ) %>%
+  distinct(
+  )
 
-#Export to csv
-write_csv(all_ea_tables_final, "all_ea_tables_final.csv")
+
+# Fix event type for Allies events
+all_ea_tables <- all_ea_tables %>%
+  mutate(
+    eventtype = if_else(!str_detect(eventcalendarname, '._allies'), 
+    'Training', eventcalendarname)
+  )
+
+
+# Select final fields and rename
+all_ea_tables <- all_ea_tables %>%
+  select(
+    eventid, dateoffsetbegin, eventname, eventtype, state, vanid, firstname, 
+    lastname, zip5
+  ) %>%
+  rename(
+    eventdate = dateoffsetbegin
+  ) %>%
+  rename(
+    attendeeid = vanid
+  ) %>%
+  rename (
+    attendeezip = zip5
+  )
+
+
+# Export to csv
+write_csv(
+  all_ea_tables, 'ea_eventattendees.csv'
+)

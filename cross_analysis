@@ -1,0 +1,165 @@
+## GOAL OF THIS SCRIPT: 
+# Receive an input of a table with different fields as the columns and unique 
+# records as the rows, where each each cells is NULL or marked with "1".  
+# Output a table that shows the overlap between each field of how many users 
+# were marked "1" for both the first and second field.
+
+# In plan English, each cell of the resulting table describes: Of everyone marked
+# "1" for the first issue, what percent were also marked "1" for the second issue?
+
+# For an example if this, check out https://docs.google.com/spreadsheets/d/1jrTEisa2SjCM_JvnlKa2paRWrGprL4TI8GRHGJXDKQg/edit?usp=sharing
+# tab "Issue Cross Calculations".
+
+
+## SET UP WORKSPACE
+
+# Clear work space
+rm(list = ls())
+
+# Add packages
+library(dplyr)
+library(janitor)
+library(tidyr)
+
+
+## FORMAT DATASET
+
+# Bring in CSV to work with
+donors_issueflags <- read.csv(file = 'donor_flags_full.csv')
+
+# Cut unneeded fields
+donors_issueflags <- donors_issueflags %>%
+  select(-police_accountability_flag
+  )
+
+# Changes '1's to 'One's in the table
+donors_issueflags[donors_issueflags=='1']<-'One'
+
+# Create dataframe for results
+issues <- c('temp')
+coverage <- c(0)
+issue_cross <- data.frame(issues, coverage)
+rm(issues)
+rm(coverage)
+
+# Extract column names of issues
+issue_list <- donors_issueflags %>%
+  select(-user_id) %>%
+  colnames() %>%
+  noquote(
+  )
+
+# Get a vector with unique combos of every 2 issues in format to use in the function
+issue_list_copy <- issue_list
+
+issue_combos <- crossing(issue_list, issue_list_copy)
+rm(issue_list)
+rm(issue_list_copy)
+
+
+## MAKE FUNCTION
+cross_calc <- function(issue_x, issue_y) {
+  
+  issue_x <- as.character(issue_x)
+  issue_y <- as.character(issue_y)
+  
+  issue_x <- enquo(issue_x)
+  issue_y <- enquo(issue_y)
+  
+  #Two-way tabyl by 2 issues: elections x coronavirus
+  t <- donors_issueflags %>%
+    tabyl(issue_x, issue_y) %>%
+    adorn_totals(c("row", "col"), fill = 0) %>%
+    adorn_title(placement = "combined")
+  
+  # New field for coverage calculation
+  t <- t %>%
+    transform(coverage = (One/Total*100))
+  
+  # Extract issue names
+  issues <- colnames(t[1])
+  
+  # Extract coverage calculation
+  coverage <- t[1,5]
+  
+  # Make a matrix
+  t2 <- data.frame(issues, coverage)
+  
+  # Add new row to issue_cross df
+  issue_cross <<- rbind(issue_cross, t2)
+}
+
+
+# FUNCTION V2
+cross_calc <- function(row) {
+  issue_x <- row[1]
+  issue_y <- row[2]
+  
+  issue_x <- as.character(issue_x)
+  issue_y <- as.character(issue_y)
+  
+  issue_x <- enquo(issue_x)
+  issue_y <- enquo(issue_y)
+  
+  #Two-way tabyl by 2 issues: elections x coronavirus
+  t <- donors_issueflags %>%
+    tabyl(!!issue_x, !!issue_y) %>%
+    adorn_totals(c("row", "col"), fill = 0) %>%
+    adorn_title(placement = "combined")
+  
+  # New field for coverage calculation
+  t <- t %>%
+    transform(coverage = (One/Total*100))
+  
+  # Extract issue names
+  issues <- colnames(t[1])
+  
+  # Extract coverage calculation
+  coverage <- t[1,5]
+  
+  # Make a matrix
+  t2 <- data.frame(issues, coverage)
+  
+  # Add new row to issue_cross df
+  issue_cross <<- rbind(issue_cross, t2)
+}
+
+# Run
+apply(issue_combos, MARGIN = 1, function(x) cross_calc(x[1],x[2]))
+
+
+## FUNCTION V3
+# Make a function
+cross_calc <- function(issue_x, issue_y) {
+  
+  issue_x <- enquo(issue_x)
+  issue_y <- enquo(issue_y)
+  
+  #Two-way tabyl by 2 issues: elections x coronavirus
+  t <- donors_issueflags %>%
+    tabyl(!!issue_x, !!issue_y) %>%
+    adorn_totals(c("row", "col"), fill = 0) %>%
+    adorn_title(placement = "combined")
+  
+  # New field for coverage calculation
+  t <- t %>%
+    transform(coverage = (One/Total*100))
+  
+  # Extract issue names
+  issues <- colnames(t[1])
+  
+  # Extract coverage calculation
+  coverage <- t[1,5]
+  
+  # Make a matrix
+  t2 <- data.frame(issues, coverage)
+  
+  return(t2)
+}
+
+# Run function
+new_row <- cross_calc(anti_trump_flag, econ_justice_flag)
+
+# Add to dataframe
+issue_cross <- rbind(issue_cross, new_row)
+rm(new_row)

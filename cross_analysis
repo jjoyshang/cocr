@@ -11,9 +11,8 @@
 # tab "Issue Cross Calculations".
 
 
-## SET UP WORKSPACE
-
-# Clear work space
+# SET UP WORKSPACE
+# Clear workspace
 rm(list = ls())
 
 # Add packages
@@ -21,9 +20,7 @@ library(dplyr)
 library(janitor)
 library(tidyr)
 
-
-## FORMAT DATASET
-
+# FORMAT INPUT TABLE
 # Bring in CSV to work with
 donors_issueflags <- read.csv(file = 'donor_flags_full.csv')
 
@@ -35,107 +32,44 @@ donors_issueflags <- donors_issueflags %>%
 # Changes '1's to 'One's in the table
 donors_issueflags[donors_issueflags=='1']<-'One'
 
-# Create dataframe for results
-issues <- c('temp')
-coverage <- c(0)
-issue_cross <- data.frame(issues, coverage)
-rm(issues)
-rm(coverage)
-
+# FORMAT INTERMEDIARY TABLE
 # Extract column names of issues
 issue_list <- donors_issueflags %>%
   select(-user_id) %>%
-  colnames() %>%
-  noquote(
-  )
+  colnames() #%>%
+  #noquote(
+  #)
 
 # Get a vector with unique combos of every 2 issues in format to use in the function
-issue_list_copy <- issue_list
+issue_list_2 <- issue_list
 
-issue_combos <- crossing(issue_list, issue_list_copy)
+issue_combos <- crossing(issue_list, issue_list_2)
 rm(issue_list)
-rm(issue_list_copy)
+rm(issue_list_2)
+
+# Remove rows with the same issue in both columns
+issue_combos <- subset(issue_combos, issue_combos$issue_list!=issue_combos$issue_list_2)
+
+##issue_combos <- issue_combos %>%
+##unite(issue_pairs, issue_list, issue_list_copy, sep = ", ")
+
+# CREATE DATAFRAME FOR OUTPUT
+issues <- c('temp')
+coverage <- c(0)
+issue_cross_output <- data.frame(issues, coverage)
+rm(issues)
+rm(coverage)
 
 
-## MAKE FUNCTION
-cross_calc <- function(issue_x, issue_y) {
-  
-  issue_x <- as.character(issue_x)
-  issue_y <- as.character(issue_y)
-  
-  issue_x <- enquo(issue_x)
-  issue_y <- enquo(issue_y)
-  
-  #Two-way tabyl by 2 issues: elections x coronavirus
-  t <- donors_issueflags %>%
-    tabyl(issue_x, issue_y) %>%
-    adorn_totals(c("row", "col"), fill = 0) %>%
-    adorn_title(placement = "combined")
-  
-  # New field for coverage calculation
-  t <- t %>%
-    transform(coverage = (One/Total*100))
-  
-  # Extract issue names
-  issues <- colnames(t[1])
-  
-  # Extract coverage calculation
-  coverage <- t[1,5]
-  
-  # Make a matrix
-  t2 <- data.frame(issues, coverage)
-  
-  # Add new row to issue_cross df
-  issue_cross <<- rbind(issue_cross, t2)
-}
+##
 
-
-# FUNCTION V2
-cross_calc <- function(row) {
-  issue_x <- row[1]
-  issue_y <- row[2]
-  
-  issue_x <- as.character(issue_x)
-  issue_y <- as.character(issue_y)
-  
-  issue_x <- enquo(issue_x)
-  issue_y <- enquo(issue_y)
-  
-  #Two-way tabyl by 2 issues: elections x coronavirus
-  t <- donors_issueflags %>%
-    tabyl(!!issue_x, !!issue_y) %>%
-    adorn_totals(c("row", "col"), fill = 0) %>%
-    adorn_title(placement = "combined")
-  
-  # New field for coverage calculation
-  t <- t %>%
-    transform(coverage = (One/Total*100))
-  
-  # Extract issue names
-  issues <- colnames(t[1])
-  
-  # Extract coverage calculation
-  coverage <- t[1,5]
-  
-  # Make a matrix
-  t2 <- data.frame(issues, coverage)
-  
-  # Add new row to issue_cross df
-  issue_cross <<- rbind(issue_cross, t2)
-}
-
-# Run
-apply(issue_combos, MARGIN = 1, function(x) cross_calc(x[1],x[2]))
-
-
-## FUNCTION V3
 # Make a function
 cross_calc <- function(issue_x, issue_y) {
   
   issue_x <- enquo(issue_x)
   issue_y <- enquo(issue_y)
   
-  #Two-way tabyl by 2 issues: elections x coronavirus
+  #Two-way tabyl by 2 issues
   t <- donors_issueflags %>%
     tabyl(!!issue_x, !!issue_y) %>%
     adorn_totals(c("row", "col"), fill = 0) %>%
@@ -154,12 +88,25 @@ cross_calc <- function(issue_x, issue_y) {
   # Make a matrix
   t2 <- data.frame(issues, coverage)
   
-  return(t2)
+  # Add new row to issue_cross df
+  issue_cross_output <<- rbind(issue_cross_output, t2)
 }
 
-# Run function
-new_row <- cross_calc(anti_trump_flag, econ_justice_flag)
 
-# Add to dataframe
-issue_cross <- rbind(issue_cross, new_row)
-rm(new_row)
+# TEST FUNCTION
+#cross_calc(anti_trump_flag, census_flag)
+
+# RUN THE LOOP
+#for(i in issue_combos) {
+#  cross_calc(issue_combos$issue_list, issue_combos$issue_list_2)
+#}
+  
+# RUN THIS SCRIPT
+mapply(cross_calc, issue_combos$issue_list, issue_combos$issue_list_2)
+
+####
+
+test_func <- function(issue_x, issue_y) {
+  print(issue_x)
+  print(issue_y)
+}

@@ -1,16 +1,3 @@
-## GOAL OF THIS SCRIPT: 
-# Receive an input of a table with different fields as the columns and unique 
-# records as the rows, where each each cells is NULL or marked with "1".  
-# Output a table that shows the overlap between each field of how many users 
-# were marked "1" for both the first and second field.
-
-# In plan English, each cell of the resulting table describes: Of everyone marked
-# "1" for the first issue, what percent were also marked "1" for the second issue?
-
-# For an example if this, check out https://docs.google.com/spreadsheets/d/1jrTEisa2SjCM_JvnlKa2paRWrGprL4TI8GRHGJXDKQg/edit?usp=sharing
-# tab "Issue Cross Calculations".
-
-
 # SET UP WORKSPACE
 # Clear workspace
 rm(list = ls())
@@ -19,6 +6,7 @@ rm(list = ls())
 library(dplyr)
 library(janitor)
 library(tidyr)
+library(reshape2)
 
 # FORMAT INPUT TABLE
 # Bring in CSV to work with
@@ -36,9 +24,8 @@ donors_issueflags[donors_issueflags=='1']<-'One'
 # Extract column names of issues
 issue_list <- donors_issueflags %>%
   select(-user_id) %>%
-  colnames() #%>%
-  #noquote(
-  #)
+  colnames(
+  )
 
 # Get a vector with unique combos of every 2 issues in format to use in the function
 issue_list_2 <- issue_list
@@ -50,9 +37,6 @@ rm(issue_list_2)
 # Remove rows with the same issue in both columns
 issue_combos <- subset(issue_combos, issue_combos$issue_list!=issue_combos$issue_list_2)
 
-##issue_combos <- issue_combos %>%
-##unite(issue_pairs, issue_list, issue_list_copy, sep = ", ")
-
 # CREATE DATAFRAME FOR OUTPUT
 issues <- c('temp')
 coverage <- c(0)
@@ -60,20 +44,17 @@ issue_cross_output <- data.frame(issues, coverage)
 rm(issues)
 rm(coverage)
 
+## CREATE FUNCTION IN 2 STEPS
 
-##
+f1 <- function(d, col_name1, col_name2, col_name3) {
+  reshape2::dcast(d, paste(col_name2, "~", col_name3), value.var = col_name1, fun.aggregate = length) %>%
+    adorn_totals(c("row", "col"), fill = 0) 
+}
 
-# Make a function
 cross_calc <- function(issue_x, issue_y) {
-  
-  issue_x <- enquo(issue_x)
-  issue_y <- enquo(issue_y)
-  
   #Two-way tabyl by 2 issues
-  t <- donors_issueflags %>%
-    tabyl(!!issue_x, !!issue_y) %>%
-    adorn_totals(c("row", "col"), fill = 0) %>%
-    adorn_title(placement = "combined")
+  t <- f1(donors_issueflags, "user_id", issue_x, issue_y)
+  colnames(t)[1] <- paste(toString(issue_x), toString(issue_y))
   
   # New field for coverage calculation
   t <- t %>%
@@ -90,23 +71,20 @@ cross_calc <- function(issue_x, issue_y) {
   
   # Add new row to issue_cross df
   issue_cross_output <<- rbind(issue_cross_output, t2)
+  
+  return(issue_cross_output)
 }
-
 
 # TEST FUNCTION
-#cross_calc(anti_trump_flag, census_flag)
+#cross_calc(issue_combos$issue_list[1], issue_combos$issue_list_2[1])
 
 # RUN THE LOOP
-#for(i in issue_combos) {
-#  cross_calc(issue_combos$issue_list, issue_combos$issue_list_2)
-#}
-  
-# RUN THIS SCRIPT
-mapply(cross_calc, issue_combos$issue_list, issue_combos$issue_list_2)
+for (i in 1:nrow(issue_combos)) {
+  cross_calc(issue_combos$issue_list[i], issue_combos$issue_list_2[i])
+}  
 
-####
+# Remove temp row
+issue_cross_output <- issue_cross_output[-c(1),]
 
-test_func <- function(issue_x, issue_y) {
-  print(issue_x)
-  print(issue_y)
-}
+# EXPORT RESULT TO CSV
+write.csv(issue_cross_output, "/Users/jjshang/Documents/Color_of_Change/R_Projects/R/Civis_projs/Cross_analysis/cross_analysis_output.csv", row.names=TRUE)

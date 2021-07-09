@@ -10,11 +10,13 @@ library(reshape2)
 
 # FORMAT INPUT TABLE
 # Bring in CSV to work with
-donors_issueflags <- read.csv(file = 'donor_flags_full.csv')
+donors_issueflags <- read.csv(file = 'new_issue_flags_june2021.csv')
 
-# Cut unneeded fields
+# Cut unneeded fields -- NEED TO CUT ALL FIELDS W/O RECORDS
 donors_issueflags <- donors_issueflags %>%
-  select(-police_accountability_flag
+  select(-anti_trump_flag, -census_flag, -courtwatch_flag, -disinformation_flag,
+         -housing_flag, -music_fashion_flag, -net_neutrality_flag,
+         -rapid_response_flag, -tech_account_flag
   )
 
 # Changes '1's to 'One's in the table
@@ -87,4 +89,4 @@ for (i in 1:nrow(issue_combos)) {
 issue_cross_output <- issue_cross_output[-c(1),]
 
 # EXPORT RESULT TO CSV
-write.csv(issue_cross_output, "/Users/jjshang/Documents/Color_of_Change/R_Projects/R/Civis_projs/Cross_analysis/cross_analysis_output.csv", row.names=TRUE)
+write.csv(issue_cross_output, "/Users/jjshang/Documents/Color_of_Change/R_Projects/R/Civis_projs/Cross_analysis/cross_analysis_output_june2021.csv", row.names=TRUE)
